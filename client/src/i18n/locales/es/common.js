@@ -32,6 +32,11 @@ export default {
     filters: 'Filtros',
     apply: 'Aplicar',
     search: 'Buscar',
+    markAsConfirmed: 'Marcar como confirmado',
+    markAsPreparing: 'Marcar como en preparación',
+    markAsReady: 'Marcar como listo',
+    markAsDelivered: 'Marcar como entregado',
+    markAsCancelled: 'Marcar como cancelado',
     languages: {
         english: 'Inglés',
         spanish: 'Español',

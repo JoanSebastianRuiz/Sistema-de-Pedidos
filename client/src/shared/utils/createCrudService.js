@@ -46,11 +46,6 @@ export const createCrudService = (basePath) => ({
         return data;
     },
 
-    getById: async (id) => {
-        const { data } = await api.get(`${basePath}/${id}`);
-        return data;
-    },
-
     create: async (payload) => {
         const body = hasFile(payload) ? toFormData(payload) : payload;
 

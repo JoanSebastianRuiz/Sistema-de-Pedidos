@@ -1,9 +1,9 @@
-import { Delete, Edit } from '@mui/icons-material';
-import useFormattedColumns from '../table/useFormattedColumns';
-import useLang from '../i18n/useLang';
-import { GridActionsCellItem } from '@mui/x-data-grid';
-import { Tooltip } from '@mui/material';
 import { useAuthStore } from '@/store/auth.store';
+import { Delete, Edit } from '@mui/icons-material';
+import { Tooltip } from '@mui/material';
+import { GridActionsCellItem } from '@mui/x-data-grid';
+import useLang from '../i18n/useLang';
+import useFormattedColumns from '../table/useFormattedColumns';
 
 const useActionsColumn = ({ onEdit, onDeleteRequest, permissions = {}, extraActions = [] }) => {
     const { t } = useLang();
@@ -44,7 +44,12 @@ const useActionsColumn = ({ onEdit, onDeleteRequest, permissions = {}, extraActi
         getActions: ({ row }) =>
             buttonConfigs
                 .map((button) => {
-                    if (!button.permission) {
+                    const hasPermission =
+                        typeof button.permission === 'function'
+                            ? button.permission(row)
+                            : button.permission;
+
+                    if (!hasPermission) {
                         return null;
                     }
 
