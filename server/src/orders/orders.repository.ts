@@ -1,11 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { ConflictException, Injectable } from '@nestjs/common';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from 'src/database/drizzle/client';
-import { orders } from 'src/database/drizzle/schema';
+import { orderDetails, orders, products } from 'src/database/drizzle/schema';
 import { CurrentUserDto } from 'src/shared/domain/current-user.dto';
-import { OrderState } from 'src/shared/domain/order-state.enum';
+import { OrderStatus } from 'src/shared/domain/order-status.enum';
 import { Role } from 'src/shared/domain/role.enum';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { ORDER_ERROR_CODES } from 'src/shared/errors';
+import _ from 'lodash';
 
 @Injectable()
 export class OrdersRepository {
@@ -24,15 +26,24 @@ export class OrdersRepository {
       case Role.ADMIN.toString():
         return await db.query.orders.findMany({
           with: {
-            orderDetails: true,
+            user: true,
+            orderDetails: {
+              with: {
+                product: true,
+              },
+            },
           },
         });
 
       case Role.CLIENT.toString():
-        return await db.query.products.findMany({
+        return await db.query.orders.findMany({
           where: and(eq(orders.userId, currentUser.id)),
           with: {
-            orderDetails: true,
+            orderDetails: {
+              with: {
+                product: true,
+              },
+            },
           },
         });
 
@@ -41,62 +52,77 @@ export class OrdersRepository {
     }
   }
 
-  async create(order: CreateOrderDto) {
+  async create(order: CreateOrderDto, currentUser: CurrentUserDto) {
     return await db.transaction(async (tx) => {
-      const [existingRole] = await tx
-        .select()
-        .from(roles)
-        .where(eq(roles.name, createRoleDto.name))
-        .limit(1);
+      const productIds = order.orderDetails.map((detail) => detail.productId);
+      const existingProducts = await tx
+        .select({
+          id: products.id,
+          price: products.price,
+        })
+        .from(products)
+        .where(inArray(products.id, productIds));
 
-      if (existingRole) {
+      if (existingProducts.length !== productIds.length) {
         throw new ConflictException({
-          message: ROLE_ERROR_CODES.ROLE_ALREADY_EXISTS,
+          message: ORDER_ERROR_CODES.SOME_PRODUCTS_NOT_FOUND,
         });
       }
 
-      if (createRoleDto.permissions.length > 0) {
-        const existingPermissions = await tx
-          .select({ id: permissions.id })
-          .from(permissions)
-          .where(inArray(permissions.id, createRoleDto.permissions));
+      const existingProductsById = _.keyBy(existingProducts, 'id');
 
-        if (existingPermissions.length !== createRoleDto.permissions.length) {
-          throw new NotFoundException({
-            message: ROLE_ERROR_CODES.PERMISSION_NOT_FOUND,
-          });
-        }
+      const orderTotal = order.orderDetails.reduce((acc, detail) => {
+        const product = existingProductsById[detail.productId];
+        return acc + product.price * detail.quantity;
+      }, 0);
+
+      const [createdOrder] = await tx
+        .insert(orders)
+        .values({
+          userId: currentUser.id,
+          status: OrderStatus.PENDING,
+          total: orderTotal,
+        })
+        .returning();
+
+      if (!createdOrder) {
+        throw new ConflictException({
+          message: ORDER_ERROR_CODES.ORDER_DETAILS_INVALID,
+        });
       }
 
-      const [role] = await tx
-        .insert(roles)
-        .values({
-          name: createRoleDto.name,
-          description: createRoleDto.description,
-          initialRoute: createRoleDto.initialRoute,
-          level: createRoleDto.level,
-        })
-        .returning(this.roleSelect);
+      const orderDetailsToInsert = order.orderDetails.map((detail) => {
+        const product = existingProductsById[detail.productId];
+        const subtotal = product.price * detail.quantity;
+        return {
+          ...detail,
+          orderId: createdOrder.id,
+          unitPrice: product.price,
+          subtotal,
+        };
+      });
 
-      if (createRoleDto.permissions.length > 0) {
-        await tx.insert(rolePermissions).values(
-          createRoleDto.permissions.map((permissionId) => ({
-            roleId: role.id,
-            permissionId,
-          })),
-        );
+      const insertedOrderDetails = await tx
+        .insert(orderDetails)
+        .values(orderDetailsToInsert)
+        .returning();
+
+      if (insertedOrderDetails.length !== orderDetailsToInsert.length) {
+        throw new ConflictException({
+          message: ORDER_ERROR_CODES.ORDER_DETAILS_INVALID,
+        });
       }
 
       return {
-        ...role,
-        permissions: createRoleDto.permissions,
+        ...createdOrder,
+        orderDetails: orderDetailsToInsert,
       };
     });
   }
 
   async updateStatus(
     id: number,
-    state: OrderState,
+    status: OrderStatus,
     currentUser: CurrentUserDto,
   ) {
     const conditions = [eq(orders.id, id)];
@@ -106,7 +132,7 @@ export class OrdersRepository {
 
     const [updatedOrder] = await db
       .update(orders)
-      .set({ state })
+      .set({ status })
       .where(and(...conditions))
       .returning();
     return updatedOrder;

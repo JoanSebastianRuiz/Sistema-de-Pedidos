@@ -1,0 +1,25 @@
+export default {
+    id: 'ID',
+    product: 'Producto',
+    products: 'Productos',
+    quantity: 'Cantidad',
+    subtotal: 'Subtotal',
+    total: 'Total',
+    status: 'Estado',
+    date: 'Fecha',
+    user: 'Cliente',
+    unitPrice: 'Precio unitario',
+    statusOptions: {
+        pending: 'Pendiente',
+        confirmed: 'Confirmado',
+        preparing: 'Preparando',
+        ready: 'Listo',
+        delivered: 'Entregado',
+        cancelled: 'Cancelado',
+    },
+    messages: {
+        create: 'Crear orden',
+        viewDetails: 'Ver detalles',
+    },
+    errors: {},
+};

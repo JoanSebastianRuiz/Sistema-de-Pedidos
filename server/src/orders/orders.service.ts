@@ -1,26 +1,60 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { UpdateOrderDto } from './dto/update-order.dto';
+import { CurrentUserDto } from 'src/shared/domain/current-user.dto';
+import { OrdersRepository } from './orders.repository';
+import { ORDER_ERROR_CODES } from 'src/shared/errors';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 @Injectable()
 export class OrdersService {
-  create(createOrderDto: CreateOrderDto) {
-    return 'This action adds a new order';
+  constructor(private readonly ordersRepository: OrdersRepository) {}
+
+  async create(createOrderDto: CreateOrderDto, currentUser: CurrentUserDto) {
+    if (!currentUser) {
+      throw new ConflictException({
+        message: ORDER_ERROR_CODES.USER_NOT_FOUND,
+      });
+    }
+
+    if (createOrderDto.orderDetails.length === 0) {
+      throw new ConflictException({
+        message: ORDER_ERROR_CODES.ORDER_DETAILS_INVALID,
+      });
+    }
+    return await this.ordersRepository.create(createOrderDto, currentUser);
   }
 
-  findAll() {
-    return `This action returns all orders`;
+  async findAll(currentUser: CurrentUserDto) {
+    if (!currentUser) {
+      throw new ConflictException({
+        message: ORDER_ERROR_CODES.USER_NOT_FOUND,
+      });
+    }
+    return await this.ordersRepository.findAll(currentUser);
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} order`;
-  }
+  async updateStatus(
+    id: number,
+    updateOrderStatusDto: UpdateOrderStatusDto,
+    currentUser: CurrentUserDto,
+  ) {
+    if (!currentUser) {
+      throw new ConflictException({
+        message: ORDER_ERROR_CODES.USER_NOT_FOUND,
+      });
+    }
 
-  update(id: number, updateOrderDto: UpdateOrderDto) {
-    return `This action updates a #${id} order`;
-  }
+    const existingOrder = await this.ordersRepository.findById(id, currentUser);
+    if (!existingOrder) {
+      throw new ConflictException({
+        message: ORDER_ERROR_CODES.ORDER_NOT_FOUND,
+      });
+    }
 
-  remove(id: number) {
-    return `This action removes a #${id} order`;
+    return await this.ordersRepository.updateStatus(
+      id,
+      updateOrderStatusDto.status,
+      currentUser,
+    );
   }
 }

@@ -32,8 +32,13 @@ export class ProductsService {
     return await this.productsRepository.create(createProductDto);
   }
 
-  findAll(currentUser: CurrentUserDto) {
-    return this.productsRepository.findAll(currentUser.role.toString());
+  async findAll(currentUser: CurrentUserDto) {
+    if (!currentUser) {
+      throw new ConflictException({
+        message: PRODUCT_ERROR_CODES.USER_NOT_FOUND,
+      });
+    }
+    return await this.productsRepository.findAll(currentUser.role.toString());
   }
 
   async update(id: number, updateProductDto: UpdateProductDto) {

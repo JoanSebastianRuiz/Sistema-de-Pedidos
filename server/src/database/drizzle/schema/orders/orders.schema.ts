@@ -7,7 +7,7 @@ import {
   timestamp,
 } from 'drizzle-orm/pg-core';
 
-import { OrderState } from 'src/shared/domain/order-state.enum';
+import { OrderStatus } from 'src/shared/domain/order-status.enum';
 import { users } from '../users/users.schema';
 
 export const orders = pgTable('orders', {
@@ -15,8 +15,8 @@ export const orders = pgTable('orders', {
 
   userId: integer('user_id').references(() => users.id),
 
-  state: text('state', {
-    enum: Object.values(OrderState) as [string, ...string[]],
+  status: text('status', {
+    enum: Object.values(OrderStatus) as [string, ...string[]],
   }).notNull(),
 
   date: timestamp('date').defaultNow().notNull(),

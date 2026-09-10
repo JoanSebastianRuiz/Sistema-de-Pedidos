@@ -15,6 +15,13 @@
       "when": 1788048147374,
       "tag": "0001_graceful_harpoon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788542749382,
+      "tag": "0002_adorable_excalibur",
+      "breakpoints": true
     }
   ]
 }
